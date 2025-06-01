@@ -13,9 +13,9 @@ cd voice-assistant-backend
 ```bash
 pip install -r requirements.txt
 ```
-2. Create a ```.env``` file:
+2. Create a ```.env.local``` file:
 ```bash
-nano .env
+nano .env.local
 ```
 3. Then add:
 ```bash
@@ -24,7 +24,7 @@ LIVEKIT_API_KEY=your-livekit-api-key
 LIVEKIT_API_SECRET=your-livekit-api-secret
 LIVEKIT_URL=wss://your-livekit-server-url
 ```
-to your new ```.env``` file with correct KEYs and URLs
+to your new ```.env.local``` file with correct KEYs and URLs
 
 4. Run the backend server:
 ```bash
