@@ -1,8 +1,7 @@
 from gtts import gTTS
 import os
-import subprocess
 
-def text_to_speech(text, language, filename="output.wav"):
-    tts = gTTS(text, lang=language)
-    tts.save(filename)
-    subprocess.Popen(["cvlc", "--play-and-exit", "--no-repeat", filename])
+def speak(text):
+    tts = gTTS(text=text, lang="en")
+    tts.save("response.mp3")
+    os.system("mpg321 response.mp3")
