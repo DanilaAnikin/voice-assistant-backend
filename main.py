@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 import os
 import openai
 
-from src.speech_to_text import recognize_speech
+from src.speech_to_text import recognize_speech  # ✅ Ensure this function works
 from src.memory import save_conversation
 from src.text_to_speech import speak
 
@@ -19,13 +19,13 @@ openai.api_key = openai_api_key
 
 app = FastAPI()
 
-# ✅ Allow CORS requests from frontend
+# ✅ Enable CORS to prevent API call issues from frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Change this to the actual frontend URL if needed
+    allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"],  # Allows all HTTP methods
-    allow_headers=["*"],  # Allows all headers
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 def chat_with_ai(prompt: str) -> str:
@@ -42,16 +42,16 @@ def chat_with_ai(prompt: str) -> str:
 async def chat_with_assistant(request: Request):
     try:
         data = await request.json()
-        user_input = data.get("text")
+        user_input = data.get("text")  # Text input
 
         if not user_input:
-            user_input = recognize_speech()
+            user_input = recognize_speech()  # ✅ Convert speech to text
 
         ai_response = chat_with_ai(user_input)
         save_conversation(user_input, ai_response)
 
         if data.get("spoken", False):
-            speak(ai_response)
+            speak(ai_response)  # ✅ Generate spoken output
 
         return {"User": user_input, "AI": ai_response}
 
