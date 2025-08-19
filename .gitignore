@@ -8,3 +8,5 @@ __pycache__/
 __pycache__/
 .env
 .DS_Store
+*.mp3
+voice_assistant.db

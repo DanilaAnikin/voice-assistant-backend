@@ -1,42 +1,59 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import os
+import openai
 
-# Load environment variables
-load_dotenv()
-
-# Set API keys from .env file
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-LIVEKIT_API_KEY = os.getenv("LIVEKIT_API_KEY")
-LIVEKIT_API_SECRET = os.getenv("LIVEKIT_API_SECRET")
-LIVEKIT_URL = os.getenv("LIVEKIT_URL")
-
-if not OPENAI_API_KEY:
-    raise ValueError("Missing OpenAI API Key! Set OPENAI_API_KEY in .env")
-
-# Import AI functions
-from src.speech_to_text import recognize_speech
-from src.ai import chat_with_ai
+from src.speech_to_text import recognize_speech  # ✅ Ensure this function works
 from src.memory import save_conversation
 from src.text_to_speech import speak
 
+# Load environment variables
+load_dotenv()
+openai_api_key = os.getenv("OPENAI_API_KEY")
+
+if not openai_api_key:
+    raise ValueError("Missing OpenAI API Key! Set OPENAI_API_KEY in .env")
+
+openai.api_key = openai_api_key
+
 app = FastAPI()
 
-@app.get("/voice-assistant")
-def voice_assistant():
-    user_input = recognize_speech()
-    ai_response = chat_with_ai(user_input)
-    save_conversation(user_input, ai_response)
-    speak(ai_response)
-    return {"User": user_input, "AI": ai_response}
+# ✅ Enable CORS to prevent API call issues from frontend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-@app.get("/livekit")
-def livekit_status():
-    return {
-        "status": "LiveKit is running",
-        "livekit_url": LIVEKIT_URL
-    }
+def chat_with_ai(prompt: str) -> str:
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-4",
+            messages=[{"role": "user", "content": prompt}]
+        )
+        return response["choices"][0]["message"]["content"]
+    except Exception as e:
+        return f"Error fetching AI response: {str(e)}"
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
+@app.post("/chat")
+async def chat_with_assistant(request: Request):
+    try:
+        data = await request.json()
+        user_input = data.get("text")  # Text input
+
+        if not user_input:
+            user_input = recognize_speech()  # ✅ Convert speech to text
+
+        ai_response = chat_with_ai(user_input)
+        save_conversation(user_input, ai_response)
+
+        if data.get("spoken", False):
+            speak(ai_response)  # ✅ Generate spoken output
+
+        return {"User": user_input, "AI": ai_response}
+
+    except Exception as e:
+        return {"error": f"Backend failure: {str(e)}"}
