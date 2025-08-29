@@ -1,10 +1,9 @@
 fastapi
 uvicorn
-openai
+openai>=1.0.0
 python-dotenv
 SpeechRecognition
 gtts
-sqlite3  # (Built into Python, but listed for clarity)
 pydantic
 numpy
 requests
@@ -12,4 +11,4 @@ tqdm
 anyio
 httpx
 starlette
-psycopg2-binary  # (If you ever use PostgreSQL, otherwise remove)
+firebase-admin
