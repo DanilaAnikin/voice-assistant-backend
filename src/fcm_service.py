@@ -1,8 +1,16 @@
-import firebase_admin
-from firebase_admin import credentials, messaging
 import os
 import json
 import time
+
+# Optional Firebase imports
+try:
+    import firebase_admin
+    from firebase_admin import credentials, messaging
+    FIREBASE_AVAILABLE = True
+except ImportError:
+    print("Warning: firebase_admin not installed. FCM features will be disabled.")
+    print("Install with: pip install firebase-admin")
+    FIREBASE_AVAILABLE = False
 
 class FCMService:
     def __init__(self):
@@ -11,6 +19,10 @@ class FCMService:
     
     def init_firebase(self):
         """Initialize Firebase Admin SDK"""
+        if not FIREBASE_AVAILABLE:
+            print("Firebase Admin SDK not available. FCM disabled.")
+            return
+            
         try:
             # Try to load service account key from file
             service_account_path = os.getenv("FIREBASE_SERVICE_ACCOUNT_PATH", "firebase-service-account.json")
@@ -29,6 +41,10 @@ class FCMService:
     
     def send_message_to_device(self, token: str, message: str, message_type: str = "server_message"):
         """Send message to specific device"""
+        if not FIREBASE_AVAILABLE:
+            print("Firebase Admin SDK not available. Cannot send message.")
+            return False
+            
         if not self.app:
             print("Firebase not initialized. Cannot send message.")
             return False
@@ -60,6 +76,10 @@ class FCMService:
     
     def send_custom_notification(self, token: str, title: str, body: str):
         """Send notification with title and body"""
+        if not FIREBASE_AVAILABLE:
+            print("Firebase Admin SDK not available. Cannot send notification.")
+            return False
+            
         if not self.app:
             return False
         
