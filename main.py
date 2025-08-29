@@ -76,9 +76,9 @@ class NotificationResponse(BaseModel):
     output: str
 
 
-# Configuration
-AI_ENABLED = True
-FILTER_ENABLED = True
+# Configuration - Set to False for simple echo mode
+AI_ENABLED = False  # Set to True to enable AI processing
+FILTER_ENABLED = True  # Set to False to disable spam filtering
 
 # Spam keywords (can be expanded)
 SPAM_KEYWORDS = [
