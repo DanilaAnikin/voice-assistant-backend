@@ -2,7 +2,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import os
-import openai
+from openai import OpenAI
 
 from src.speech_to_text import recognize_speech  # ✅ Ensure this function works
 from src.memory import save_conversation
@@ -12,10 +12,10 @@ from src.text_to_speech import speak
 load_dotenv()
 openai_api_key = os.getenv("OPENAI_API_KEY")
 
+client = OpenAI(api_key=openai_api_key)
+
 if not openai_api_key:
     raise ValueError("Missing OpenAI API Key! Set OPENAI_API_KEY in .env")
-
-openai.api_key = openai_api_key
 
 app = FastAPI()
 
@@ -30,11 +30,9 @@ app.add_middleware(
 
 def chat_with_ai(prompt: str) -> str:
     try:
-        response = openai.ChatCompletion.create(
-            model="gpt-4",
-            messages=[{"role": "user", "content": prompt}]
-        )
-        return response["choices"][0]["message"]["content"]
+        response = client.chat.completions.create(model="gpt-4",
+        messages=[{"role": "user", "content": prompt}])
+        return response.choices[0].message.content
     except Exception as e:
         return f"Error fetching AI response: {str(e)}"
 
