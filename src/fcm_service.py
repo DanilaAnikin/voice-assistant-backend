@@ -25,19 +25,26 @@ class FCMService:
             
         try:
             # Try to load service account key from file
-            service_account_path = os.getenv("FIREBASE_SERVICE_ACCOUNT_PATH", "firebase-service-account.json")
+            service_account_paths = [
+                "firebase_admin_config.json",  # New path
+                os.getenv("FIREBASE_SERVICE_ACCOUNT_PATH", "firebase-service-account.json"),  # Original path
+                "firebase-service-account.json"  # Backup path
+            ]
             
-            if os.path.exists(service_account_path):
-                cred = credentials.Certificate(service_account_path)
-                self.app = firebase_admin.initialize_app(cred)
-                print("Firebase initialized with service account file")
-            else:
-                print("Firebase service account file not found. FCM disabled.")
-                print(f"Create {service_account_path} with your Firebase service account key")
+            for service_account_path in service_account_paths:
+                if os.path.exists(service_account_path):
+                    cred = credentials.Certificate(service_account_path)
+                    self.app = firebase_admin.initialize_app(cred)
+                    print(f"✅ Firebase initialized successfully with {service_account_path}")
+                    print(f"🔥 FCM Push Notifications are now active!")
+                    return
+            
+            print("❌ Firebase service account file not found. FCM disabled.")
+            print("📁 Looking for: firebase_admin_config.json or firebase-service-account.json")
                 
         except Exception as e:
-            print(f"Failed to initialize Firebase: {e}")
-            print("FCM features will be disabled")
+            print(f"❌ Failed to initialize Firebase: {e}")
+            print("🔥 FCM features will be disabled")
     
     def send_message_to_device(self, token: str, message: str, message_type: str = "server_message"):
         """Send message to specific device"""

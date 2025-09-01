@@ -1,0 +1,15 @@
+# Test requirements for Voice Assistant Backend
+# These are additional dependencies needed for running tests
+
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
+pytest-mock>=3.10.0
+pytest-cov>=4.0.0
+httpx>=0.24.0
+requests-mock>=1.10.0
+
+# FastAPI testing
+fastapi[all]>=0.100.0
+
+# For mocking and testing
+unittest-mock>=1.0.1

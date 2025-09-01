@@ -13,6 +13,5 @@ anyio
 httpx
 starlette
 
-# Optional: Firebase Cloud Messaging support
-# Uncomment the line below if you want FCM features
-# firebase-admin
+# Firebase Cloud Messaging support - NOW ENABLED
+firebase-admin

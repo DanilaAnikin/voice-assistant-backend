@@ -12,6 +12,10 @@ from src.memory import save_conversation
 from src.text_to_speech import speak
 from src.fcm_service import fcm_service
 
+# Enhanced imports for Firebase
+import logging
+from datetime import datetime
+
 # Load environment variables
 load_dotenv()
 openai_api_key = os.getenv("OPENAI_API_KEY")
@@ -21,7 +25,11 @@ client = OpenAI(api_key=openai_api_key)
 if not openai_api_key:
     raise ValueError("Missing OpenAI API Key! Set OPENAI_API_KEY in .env")
 
-app = FastAPI()
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+app = FastAPI(title="🔥 Voice Assistant with Firebase Push Notifications", version="2.0")
 
 # ✅ Enable CORS to prevent API call issues from frontend
 app.add_middleware(
@@ -40,11 +48,21 @@ def chat_with_ai(prompt: str) -> str:
     except Exception as e:
         return f"Error fetching AI response: {str(e)}"
 
-@app.post("/chat")
-async def chat_with_assistant(request: Request):
+class ChatRequest(BaseModel):
+    text: str = None
+    spoken: bool = False
+    device_id: str = None
+
+class ChatResponse(BaseModel):
+    User: str
+    AI: str
+    error: str = None
+    pushed_to_devices: list = []
+
+@app.post("/chat", response_model=ChatResponse)
+async def chat_with_assistant(request: ChatRequest):
     try:
-        data = await request.json()
-        user_input = data.get("text")  # Text input
+        user_input = request.text
 
         if not user_input:
             user_input = recognize_speech()  # ✅ Convert speech to text
@@ -52,13 +70,44 @@ async def chat_with_assistant(request: Request):
         ai_response = chat_with_ai(user_input)
         save_conversation(user_input, ai_response)
 
-        if data.get("spoken", False):
+        if request.spoken:
             speak(ai_response)  # ✅ Generate spoken output
 
-        return {"User": user_input, "AI": ai_response}
+        # 🔥 NEW: Send AI response as push notification to registered devices
+        pushed_devices = []
+        if fcm_service.app and registered_devices:
+            if request.device_id and request.device_id in registered_devices:
+                # Send to specific device
+                device_data = registered_devices[request.device_id]
+                fcm_token = device_data["fcm_token"]
+                success = fcm_service.send_message_to_device(fcm_token, ai_response, "ai_response")
+                if success:
+                    pushed_devices.append(request.device_id)
+                    logger.info(f"📤 AI response sent to device: {request.device_id}")
+            else:
+                # Send to all registered devices
+                for device_id, device_data in registered_devices.items():
+                    fcm_token = device_data["fcm_token"]
+                    success = fcm_service.send_message_to_device(fcm_token, ai_response, "ai_response")
+                    if success:
+                        pushed_devices.append(device_id)
+                
+                if pushed_devices:
+                    logger.info(f"📤 AI response sent to {len(pushed_devices)} devices: {pushed_devices}")
+
+        return ChatResponse(
+            User=user_input, 
+            AI=ai_response,
+            pushed_to_devices=pushed_devices
+        )
 
     except Exception as e:
-        return {"error": f"Backend failure: {str(e)}"}
+        logger.error(f"❌ Chat processing failed: {str(e)}")
+        return ChatResponse(
+            User=request.text or "",
+            AI="",
+            error=f"Backend failure: {str(e)}"
+        )
 
 
 # Notification processing models
@@ -189,26 +238,62 @@ async def process_notification(notification: NotificationRequest) -> Notificatio
         return NotificationResponse(result="success", output=f"{notification.app}: {notification.text}")
 
 
-# Device token storage (in production, use a proper database)
-device_tokens = {}
+# Enhanced device registration models
+class DeviceRegistrationRequest(BaseModel):
+    device_id: str
+    fcm_token: str
+    device_type: str = "android"
+    app_version: str = "1.0"
 
-@app.post("/register_device")
-async def register_device(request: Request):
-    """Register FCM token for device"""
+class DeviceRegistrationResponse(BaseModel):
+    status: str
+    message: str
+    device_id: str
+
+# Enhanced device storage (in production, use a proper database)
+registered_devices = {}
+
+@app.post("/register_device", response_model=DeviceRegistrationResponse)
+async def register_device(request: DeviceRegistrationRequest):
+    """Register Android device for push notifications"""
     try:
-        data = await request.json()
-        device_id = data.get("device_id", "default")
-        fcm_token = data.get("fcm_token", "")
+        # Store device registration with metadata
+        device_data = {
+            "device_id": request.device_id,
+            "fcm_token": request.fcm_token,
+            "device_type": request.device_type,
+            "app_version": request.app_version,
+            "registered_at": datetime.now().isoformat()
+        }
         
-        if fcm_token:
-            device_tokens[device_id] = fcm_token
-            print(f"Registered device {device_id} with token: {fcm_token[:20]}...")
-            return {"result": "success", "message": "Device registered"}
-        else:
-            return {"error": "No FCM token provided"}
-    
+        registered_devices[request.device_id] = device_data
+        
+        logger.info(f"📱 Device registered: {request.device_id} with token: {request.fcm_token[:20]}...")
+        
+        # Send welcome message to newly registered device
+        if fcm_service.app:
+            welcome_msg = "🔥 Welcome! Your Voice Assistant is now connected and ready for remote notifications!"
+            success = fcm_service.send_message_to_device(
+                request.fcm_token, 
+                welcome_msg, 
+                "welcome_message"
+            )
+            if success:
+                logger.info(f"📤 Welcome message sent to {request.device_id}")
+        
+        return DeviceRegistrationResponse(
+            status="success", 
+            message="Device registered successfully! Welcome message sent.",
+            device_id=request.device_id
+        )
+        
     except Exception as e:
-        return {"error": f"Error registering device: {str(e)}"}
+        logger.error(f"❌ Device registration failed: {str(e)}")
+        return DeviceRegistrationResponse(
+            status="error",
+            message=f"Registration failed: {str(e)}",
+            device_id=request.device_id
+        )
 
 @app.post("/send_message")
 async def send_custom_message(request: Request):
@@ -223,9 +308,11 @@ async def send_custom_message(request: Request):
             return {"error": "No message provided"}
         
         # Get device token
-        fcm_token = device_tokens.get(device_id)
-        if not fcm_token:
+        if device_id not in registered_devices:
             return {"error": f"No registered device found for {device_id}"}
+        
+        device_data = registered_devices[device_id]
+        fcm_token = device_data["fcm_token"]
         
         # Send via FCM
         success = fcm_service.send_message_to_device(fcm_token, message, message_type)
@@ -250,9 +337,11 @@ async def send_notification(request: Request):
         if not body:
             return {"error": "No message body provided"}
         
-        fcm_token = device_tokens.get(device_id)
-        if not fcm_token:
+        if device_id not in registered_devices:
             return {"error": f"No registered device found for {device_id}"}
+        
+        device_data = registered_devices[device_id]
+        fcm_token = device_data["fcm_token"]
         
         success = fcm_service.send_custom_notification(fcm_token, title, body)
         
@@ -266,8 +355,124 @@ async def send_notification(request: Request):
 
 @app.get("/devices")
 async def list_devices():
-    """List registered devices"""
+    """List all registered devices with details"""
     return {
-        "devices": list(device_tokens.keys()),
-        "count": len(device_tokens)
+        "devices": {
+            device_id: {
+                "device_type": data["device_type"],
+                "app_version": data["app_version"], 
+                "registered_at": data["registered_at"],
+                "fcm_token": data["fcm_token"][:20] + "..." if data["fcm_token"] else None
+            }
+            for device_id, data in registered_devices.items()
+        },
+        "count": len(registered_devices),
+        "firebase_active": fcm_service.app is not None
     }
+
+@app.get("/firebase_status")
+async def firebase_status():
+    """Check Firebase and system status"""
+    return {
+        "firebase_initialized": fcm_service.app is not None,
+        "registered_devices_count": len(registered_devices),
+        "can_send_notifications": fcm_service.app is not None and len(registered_devices) > 0,
+        "ai_enabled": AI_ENABLED,
+        "filter_enabled": FILTER_ENABLED
+    }
+
+@app.post("/broadcast_message")
+async def broadcast_message(message: str):
+    """Send message to all registered devices"""
+    try:
+        if not fcm_service.app:
+            return {"status": "error", "message": "Firebase not initialized"}
+        
+        if not registered_devices:
+            return {"status": "error", "message": "No registered devices"}
+        
+        successful_devices = []
+        failed_devices = []
+        
+        for device_id, device_data in registered_devices.items():
+            fcm_token = device_data["fcm_token"]
+            success = fcm_service.send_message_to_device(fcm_token, message, "broadcast")
+            
+            if success:
+                successful_devices.append(device_id)
+            else:
+                failed_devices.append(device_id)
+        
+        logger.info(f"📢 Broadcast sent to {len(successful_devices)} devices")
+        
+        return {
+            "status": "completed",
+            "message": f"Broadcast sent to {len(successful_devices)} devices",
+            "successful_devices": successful_devices,
+            "failed_devices": failed_devices,
+            "total_devices": len(registered_devices)
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Broadcast failed: {str(e)}")
+        return {"status": "error", "message": str(e)}
+
+@app.post("/send_message_to_device")
+async def send_message_to_device_endpoint(device_id: str, message: str):
+    """Send custom message to specific device"""
+    try:
+        if not fcm_service.app:
+            return {"status": "error", "message": "Firebase not initialized"}
+        
+        if device_id not in registered_devices:
+            return {"status": "error", "message": f"Device {device_id} not found"}
+        
+        device_data = registered_devices[device_id]
+        fcm_token = device_data["fcm_token"]
+        
+        success = fcm_service.send_message_to_device(fcm_token, message, "custom_message")
+        
+        if success:
+            logger.info(f"📤 Message sent to {device_id}: {message}")
+            return {
+                "status": "success",
+                "message": "Message sent successfully",
+                "device_id": device_id
+            }
+        else:
+            return {
+                "status": "failed", 
+                "message": "Failed to send message",
+                "device_id": device_id
+            }
+        
+    except Exception as e:
+        logger.error(f"❌ Send message failed: {str(e)}")
+        return {"status": "error", "message": str(e)}
+
+# Startup event
+@app.on_event("startup")
+async def startup_event():
+    """Server startup initialization"""
+    logger.info("🚀 Starting Voice Assistant Server with Firebase Push Notifications")
+    logger.info("📱 Ready to receive Android device registrations!")
+    
+    if fcm_service.app:
+        logger.info("✅ Firebase Admin SDK is active - Push notifications enabled")
+    else:
+        logger.warning("❌ Firebase Admin SDK not initialized - Push notifications disabled")
+        logger.info("📁 Make sure firebase_admin_config.json exists in the project directory")
+
+# Add main execution
+if __name__ == "__main__":
+    import uvicorn
+    logger.info("🔥 Voice Assistant Server with Firebase Push Notifications")
+    logger.info("📱 Endpoints available:")
+    logger.info("   POST /register_device - Register Android devices")
+    logger.info("   POST /chat - Chat with AI (sends push notifications)")
+    logger.info("   POST /notify - Process notifications")
+    logger.info("   POST /send_message_to_device - Send custom messages")
+    logger.info("   POST /broadcast_message - Send to all devices")
+    logger.info("   GET /devices - List registered devices")
+    logger.info("   GET /firebase_status - Check system status")
+    uvicorn.run(app, host="0.0.0.0", port=8000)
