@@ -303,6 +303,7 @@ async def send_custom_message(request: Request):
         message = data.get("message", "")
         device_id = data.get("device_id", "default")
         message_type = data.get("type", "server_message")
+        silent = data.get("silent", False)
         
         if not message:
             return {"error": "No message provided"}
@@ -314,11 +315,12 @@ async def send_custom_message(request: Request):
         device_data = registered_devices[device_id]
         fcm_token = device_data["fcm_token"]
         
-        # Send via FCM
-        success = fcm_service.send_message_to_device(fcm_token, message, message_type)
+        # Send via FCM with silent flag
+        success = fcm_service.send_message_to_device(fcm_token, message, message_type, silent)
         
         if success:
-            return {"result": "success", "message": f"Message sent to {device_id}"}
+            silent_text = " (silent)" if silent else ""
+            return {"result": "success", "message": f"Message sent to {device_id}{silent_text}"}
         else:
             return {"error": "Failed to send FCM message"}
     
@@ -382,7 +384,7 @@ async def firebase_status():
     }
 
 @app.post("/broadcast_message")
-async def broadcast_message(message: str):
+async def broadcast_message(message: str, silent: bool = False):
     """Send message to all registered devices"""
     try:
         if not fcm_service.app:
@@ -396,7 +398,7 @@ async def broadcast_message(message: str):
         
         for device_id, device_data in registered_devices.items():
             fcm_token = device_data["fcm_token"]
-            success = fcm_service.send_message_to_device(fcm_token, message, "broadcast")
+            success = fcm_service.send_message_to_device(fcm_token, message, "broadcast", silent)
             
             if success:
                 successful_devices.append(device_id)

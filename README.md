@@ -588,34 +588,34 @@ Download and place in `app/` directory. Example structure:
 ```json
 {
   "project_info": {
-    "project_number": "xxx",
-    "project_id": "xxx",
-    "storage_bucket": "xxx"
+    "project_number": "123456789012",
+    "project_id": "voice-assistant-app-12345",
+    "storage_bucket": "voice-assistant-app-12345.appspot.com"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "xxx",
+        "mobilesdk_app_id": "1:123456789012:android:abcdef1234567890abcdef",
         "android_client_info": {
-          "package_name": "xxx"
+          "package_name": "com.danila.voiceassistant"
         }
       },
       "oauth_client": [
         {
-          "client_id": "xxx",
+          "client_id": "123456789012-abcdefghijklmnopqrstuvwxyz123456.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
       "api_key": [
         {
-          "current_key": "xxx"
+          "current_key": "key_here"
         }
       ],
       "services": {
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "xxx",
+              "client_id": "123456789012-zyxwvutsrqponmlkjihgfedcba987654.apps.googleusercontent.com",
               "client_type": 3
             }
           ]
@@ -623,7 +623,7 @@ Download and place in `app/` directory. Example structure:
       }
     }
   ],
-  "configuration_version": "x"
+  "configuration_version": "1"
 }
 ```
 
@@ -640,15 +640,15 @@ Download and place in `app/` directory. Example structure:
 ```json
 {
   "type": "service_account",
-  "project_id": "xxx",
-  "private_key_id": "xxx",
-  "private_key": "-----BEGIN PRIVATE KEY-----\xxx\n-----END PRIVATE KEY-----\n",
-  "client_email": "firebase-adminsdk-xyz12@voice-assistant-app-12345.iam.gserviceaccount.com",
-  "client_id": "123456789012345678901",
+  "project_id": "YOUR_PROJECT_ID",
+  "private_key_id": "YOUR_PRIVATE_KEY_ID",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nYOUR_PRIVATE_KEY\n-----END PRIVATE KEY-----\n",
+  "client_email": "YOUR_CLIENT_EMAIL",
+  "client_id": "YOUR_CLIENT_ID",
   "auth_uri": "https://accounts.google.com/o/oauth2/auth",
   "token_uri": "https://oauth2.googleapis.com/token",
   "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-xyz12%40voice-assistant-app-12345.iam.gserviceaccount.com",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/YOUR_CLIENT_EMAIL",
   "universe_domain": "googleapis.com"
 }
 ```

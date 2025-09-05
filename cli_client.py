@@ -35,17 +35,41 @@ class VoiceAssistantCLI:
         except requests.exceptions.RequestException as e:
             return {"error": f"Request failed: {str(e)}"}
     
-    def send_message(self, message: str, device_id: str = "default") -> dict:
+    def get_first_device_id(self) -> str:
+        """Get first available device ID"""
+        devices_result = self.list_devices()
+        if "error" in devices_result:
+            return "default"
+        
+        devices = devices_result.get("devices", {})
+        if devices:
+            return list(devices.keys())[0]
+        return "default"
+    
+    def send_message(self, message: str, device_id: str = "default", silent: bool = False) -> dict:
         """Send custom message to specific device"""
+        # If device_id is "default" but no default device exists, use first available
+        if device_id == "default":
+            actual_device_id = self.get_first_device_id()
+            if actual_device_id != "default":
+                device_id = actual_device_id
+        
         data = {
             "message": message,
             "device_id": device_id,
-            "type": "cli_message"
+            "type": "cli_message",
+            "silent": silent
         }
         return self._make_request("POST", "/send_message", data)
     
     def send_notification(self, title: str, body: str, device_id: str = "default") -> dict:
         """Send notification with title and body"""
+        # If device_id is "default" but no default device exists, use first available
+        if device_id == "default":
+            actual_device_id = self.get_first_device_id()
+            if actual_device_id != "default":
+                device_id = actual_device_id
+        
         data = {
             "title": title,
             "body": body,
@@ -53,9 +77,9 @@ class VoiceAssistantCLI:
         }
         return self._make_request("POST", "/send_notification", data)
     
-    def broadcast_message(self, message: str) -> dict:
+    def broadcast_message(self, message: str, silent: bool = False) -> dict:
         """Send message to all registered devices"""
-        return self._make_request("POST", f"/broadcast_message?message={message}")
+        return self._make_request("POST", f"/broadcast_message?message={message}&silent={silent}")
     
     def send_to_device(self, device_id: str, message: str) -> dict:
         """Send message to specific device using endpoint params"""
@@ -126,6 +150,7 @@ Examples:
     send_parser = subparsers.add_parser("send", help="Send message to device")
     send_parser.add_argument("message", help="Message to send")
     send_parser.add_argument("--device", default="default", help="Target device ID")
+    send_parser.add_argument("--silent", action="store_true", help="Send message silently (no TTS)")
     
     # Send notification command  
     notify_parser = subparsers.add_parser("notify", help="Send notification")
@@ -136,6 +161,7 @@ Examples:
     # Broadcast command
     broadcast_parser = subparsers.add_parser("broadcast", help="Send message to all devices")
     broadcast_parser.add_argument("message", help="Message to broadcast")
+    broadcast_parser.add_argument("--silent", action="store_true", help="Send broadcast silently (no TTS)")
     
     # Chat command
     chat_parser = subparsers.add_parser("chat", help="Chat with AI")
@@ -162,11 +188,11 @@ Examples:
     # Execute command
     try:
         if args.command == "send":
-            result = cli.send_message(args.message, args.device)
+            result = cli.send_message(args.message, args.device, args.silent)
         elif args.command == "notify":
             result = cli.send_notification(args.title, args.body, args.device)
         elif args.command == "broadcast":
-            result = cli.broadcast_message(args.message)
+            result = cli.broadcast_message(args.message, args.silent)
         elif args.command == "chat":
             result = cli.chat(args.text, args.device, args.spoken)
         elif args.command == "devices":

@@ -29,31 +29,46 @@ class FirebasePushNotificationManager:
     def __init__(self):
         self.initialized = initialize_firebase()
         
-    def send_message_to_device(self, fcm_token: str, message_text: str, title: str = "Voice Assistant") -> bool:
+    def send_message_to_device(self, fcm_token: str, message_text: str, title: str = "Voice Assistant", silent: bool = False) -> bool:
         """Send a push notification to a specific device"""
         if not self.initialized:
             logging.error("Firebase not initialized")
             return False
             
         try:
+            # Create the message data
+            message_data = {
+                'message': message_text,
+                'type': 'server_response',
+                'timestamp': datetime.now().isoformat(),
+                'silent': str(silent).lower(),  # Convert boolean to string for Firebase
+                'wake_device': 'true'  # Always wake device for server messages
+            }
+            
+            # Create Android config - high priority to ensure delivery in sleep mode
+            android_config = messaging.AndroidConfig(
+                priority='high',  # Critical for sleep mode delivery
+                notification=messaging.AndroidNotification(
+                    channel_id='voice_assistant_channel',
+                    sound='default' if not silent else None,
+                    priority='high',
+                    default_sound=not silent
+                ),
+                # Wake up the device
+                data={
+                    'wake_device': 'true',
+                    'silent': str(silent).lower()
+                }
+            )
+            
             # Create the message
             message = messaging.Message(
-                data={
-                    'message': message_text,
-                    'type': 'server_response',
-                    'timestamp': datetime.now().isoformat()
-                },
+                data=message_data,
                 notification=messaging.Notification(
                     title=title,
                     body=message_text
                 ),
-                android=messaging.AndroidConfig(
-                    priority='high',  # Ensures delivery even when app is in background
-                    notification=messaging.AndroidNotification(
-                        channel_id='voice_assistant_channel',
-                        sound='default'
-                    )
-                ),
+                android=android_config,
                 token=fcm_token
             )
             
@@ -66,7 +81,7 @@ class FirebasePushNotificationManager:
             logging.error(f"Failed to send message to {fcm_token[:20]}...: {e}")
             return False
     
-    def send_message_to_multiple_devices(self, fcm_tokens: List[str], message_text: str, title: str = "Voice Assistant") -> Dict[str, bool]:
+    def send_message_to_multiple_devices(self, fcm_tokens: List[str], message_text: str, title: str = "Voice Assistant", silent: bool = False) -> Dict[str, bool]:
         """Send a push notification to multiple devices"""
         if not self.initialized:
             logging.error("Firebase not initialized")
@@ -75,24 +90,38 @@ class FirebasePushNotificationManager:
         results = {}
         
         try:
+            # Create the message data
+            message_data = {
+                'message': message_text,
+                'type': 'server_response',
+                'timestamp': datetime.now().isoformat(),
+                'silent': str(silent).lower(),
+                'wake_device': 'true'
+            }
+            
+            # Create Android config
+            android_config = messaging.AndroidConfig(
+                priority='high',
+                notification=messaging.AndroidNotification(
+                    channel_id='voice_assistant_channel',
+                    sound='default' if not silent else None,
+                    priority='high',
+                    default_sound=not silent
+                ),
+                data={
+                    'wake_device': 'true',
+                    'silent': str(silent).lower()
+                }
+            )
+            
             # Create the message
             message = messaging.MulticastMessage(
-                data={
-                    'message': message_text,
-                    'type': 'server_response',
-                    'timestamp': datetime.now().isoformat()
-                },
+                data=message_data,
                 notification=messaging.Notification(
                     title=title,
                     body=message_text
                 ),
-                android=messaging.AndroidConfig(
-                    priority='high',
-                    notification=messaging.AndroidNotification(
-                        channel_id='voice_assistant_channel',
-                        sound='default'
-                    )
-                ),
+                android=android_config,
                 tokens=fcm_tokens
             )
             
